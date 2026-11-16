@@ -1,10 +1,33 @@
 from datetime import date
 
-from core.utils import DENDA_PER_HARI
+from core.utils import DENDA_PER_HARI, PROGRAM_STUDI_PER_JURUSAN
 
 
 def migrate_schema(conn):
     tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if "migrasi_data" in tables:
+        conn.execute("DROP TABLE migrasi_data")
+        tables.remove("migrasi_data")
+    if "mahasiswa" in tables:
+        mahasiswa_columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(mahasiswa)")
+        }
+        if "jurusan" not in mahasiswa_columns:
+            conn.execute("ALTER TABLE mahasiswa ADD COLUMN jurusan TEXT DEFAULT ''")
+        programs_by_name = {
+            program: jurusan
+            for jurusan, programs in PROGRAM_STUDI_PER_JURUSAN.items()
+            for program in programs
+        }
+        rows = conn.execute("SELECT id,prodi,jurusan FROM mahasiswa").fetchall()
+        for row in rows:
+            jurusan = programs_by_name.get(row["prodi"])
+            if jurusan and not str(row["jurusan"] or "").strip():
+                conn.execute(
+                    "UPDATE mahasiswa SET jurusan=? WHERE id=?",
+                    (jurusan, row["id"]),
+                )
+
     if "inventaris" in tables and "detail_peminjaman" in tables:
         inventaris_columns = {
             row[1] for row in conn.execute("PRAGMA table_info(inventaris)")

@@ -1,3 +1,5 @@
+import re
+
 HALAMAN = [
     "Dashboard",
     "Penyewaan Baru",
@@ -5,6 +7,7 @@ HALAMAN = [
     "Riwayat Penyewaan",
     "Laporan",
     "Inventaris",
+    "Data Penyewa",
 ]
 
 DENDA_PER_HARI = 1500
@@ -48,3 +51,37 @@ PROGRAM_STUDI_PER_JURUSAN = {
         "D4-Perancangan Jalan dan Jembatan",
     ],
 }
+
+
+def validasi_penyewa(nim, nama, no_hp, email, jurusan, prodi):
+    errors = []
+    nim_value = str(nim or "").strip()
+    nama_value = str(nama or "").strip()
+    hp_value = str(no_hp or "").strip()
+    email_value = str(email or "").strip()
+    jurusan_value = str(jurusan or "").strip()
+    prodi_value = str(prodi or "").strip()
+
+    if not nama_value:
+        errors.append("Nama penyewa wajib diisi.")
+    if not nim_value:
+        errors.append("NIM wajib diisi.")
+    if not hp_value:
+        errors.append("Nomor telepon wajib diisi.")
+    if not email_value:
+        errors.append("Email wajib diisi.")
+    if not jurusan_value:
+        errors.append("Jurusan wajib diisi.")
+    if not prodi_value:
+        errors.append("Program studi wajib diisi.")
+
+    if nim_value and not nim_value.isdigit():
+        errors.append("NIM hanya boleh berisi angka tanpa titik, spasi, atau huruf.")
+    if hp_value and not hp_value.isdigit():
+        errors.append("Nomor telepon hanya boleh berisi angka.")
+    if email_value and not re.fullmatch(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email_value):
+        errors.append("Format email tidak valid.")
+    if jurusan_value and prodi_value and prodi_value not in PROGRAM_STUDI_PER_JURUSAN.get(jurusan_value, []):
+        errors.append("Program studi harus sesuai dengan jurusan yang dipilih.")
+
+    return errors

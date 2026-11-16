@@ -33,3 +33,10 @@ la
 - Pengembalian dicatat pada tabel `pengembalian` (1 transaksi maksimal 1 catatan), lengkap dengan tanggal kembali aktual, lama terlambat, dan total denda yang disalin saat diproses.
 - Kondisi barang dicatat per barang pada `detail_peminjaman.kondisi_barang`.
 - Pengembalian sebagian dan riwayat mutasi stok belum didukung.
+
+## 8. Data Master Penyewa
+- Data master penyewa berfungsi sebagai sumber utama informasi penyewa, khususnya nomor telepon dan email.
+- Menu baru `Data Penyewa` wajib menampilkan data penyewa, mengelola data master, dan menjadi satu-satunya titik perubahan nomor telepon atau email.
+- Form `Penyewaan Baru` hanya menerima NIM dan membaca data penyewa dari master; data master tidak boleh diubah dari transaksi.
+- Jurusan dan Program studi wajib diisi pada data penyewa.
+- Data penyewa diubah lewat ikon edit pada kolom EDIT di tabel Data Penyewa.

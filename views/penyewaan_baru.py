@@ -354,54 +354,46 @@ def render():
         st.warning("Tambahkan kategori sebelum mencatat penyewaan.")
         return
 
-    st.markdown("#### Data mahasiswa")
-    nim_col,nama_col=st.columns(2)
-    matched_student=st.session_state.get("loan_matched_student")
-    nim=nim_col.text_input(
+    st.markdown("#### Data penyewa")
+    nim = st.text_input(
         "NIM",
         key="loan_nim",
-        on_change=_lookup_loan_student,
+        help="Tulis NIM angka saja tanpa titik",
     )
-    nama=nama_col.text_input(
-        "Nama lengkap",
-        key="loan_nama",
-        disabled=matched_student is not None,
+    matched_student = (
+        db.get_student_by_nim(nim.strip()) if nim.strip() and nim.strip().isdigit() else None
     )
-
-    jurusan_col,prodi_col=st.columns(2)
-    jurusan_options=list(PROGRAM_STUDI_PER_JURUSAN)
-    existing_prodi=matched_student["prodi"] if matched_student else None
-    if matched_student and not any(
-        existing_prodi in programs
-        for programs in PROGRAM_STUDI_PER_JURUSAN.values()
-    ):
-        jurusan_options.append("Data jurusan lama")
-    jurusan=jurusan_col.selectbox(
-        "Jurusan",
-        jurusan_options,
-        key="loan_jurusan",
-        on_change=_reset_loan_program_studi,
-    )
-    program_options=PROGRAM_STUDI_PER_JURUSAN.get(jurusan, [])
-    if matched_student and existing_prodi and existing_prodi not in program_options:
-        program_options=[existing_prodi]
-    prodi=prodi_col.selectbox(
-        "Program studi",
-        program_options,
-        key="loan_program_studi",
+    student_complete = matched_student is not None and all(
+        str(matched_student.get(field) or "").strip()
+        for field in ("nama", "no_hp", "email", "jurusan", "prodi")
     )
 
-    hp_col,email_col=st.columns(2)
-    no_hp=hp_col.text_input(
-        "Nomor HP",
-        key="loan_hp",
-    )
-    email=email_col.text_input(
-        "Email",
-        key="loan_email",
-    )
-    if matched_student:
-        st.caption("Data mahasiswa ditemukan berdasarkan NIM dan telah diisi otomatis.")
+    if nim and not nim.strip().isdigit():
+        st.error("NIM hanya boleh berisi angka tanpa titik.")
+    elif nim.strip() and matched_student is None:
+        st.error(f"NIM {nim.strip()} belum terdaftar. Daftarkan dulu di menu Data Penyewa.")
+        if st.button("Buka Data Penyewa", key="open_data_penyewa_from_loan"):
+            st.session_state.update(nav="Data Penyewa")
+            st.rerun()
+    elif nim.strip() and matched_student and not student_complete:
+        st.warning("Data penyewa belum lengkap. Lengkapi dulu di menu Data Penyewa.")
+        if st.button("Buka Data Penyewa", key="open_data_penyewa_from_loan_incomplete"):
+            st.session_state.update(nav="Data Penyewa")
+            st.rerun()
+    elif matched_student:
+        with st.container(border=True):
+            st.markdown("**Informasi penyewa**")
+            st.markdown(
+                f"**Nama:** {matched_student.get('nama') or '-'}\n"
+                f"**NIM:** {matched_student.get('nim') or '-'}\n"
+                f"**Jurusan:** {matched_student.get('jurusan') or '-'}\n"
+                f"**Program Studi:** {matched_student.get('prodi') or '-'}\n"
+                f"**Nomor Telepon:** {matched_student.get('no_hp') or '-'}\n"
+                f"**Email:** {matched_student.get('email') or '-'}",
+            )
+        st.caption(
+            "Data diambil dari menu Data Penyewa. Untuk mengubah nomor telepon atau email, gunakan menu Data Penyewa."
+        )
 
     st.markdown("#### Detail penyewaan")
     if "loan_item_rows" not in st.session_state:
@@ -594,77 +586,40 @@ def render():
     tgl_pinjam=a.date_input("Tanggal sewa",value=date.today())
     tgl_kembali=b.date_input("Rencana kembali",value=date.today()+timedelta(days=3),min_value=date.today())
     catatan=st.text_area("Catatan",placeholder="Tuliskan keperluan penyewaan")
-    ok=st.button("Simpan penyewaan",type="primary",width="stretch")
+
+    detail_valid=(
+        bool(selected_items)
+        and all_rows_valid
+        and all(isinstance(qty, int) and qty > 0 for _, qty in selected_items)
+    )
+    if not detail_valid:
+        st.warning("Silakan pilih barang dan tentukan jumlah unit yang akan disewa.")
+
+    dates_valid=tgl_kembali >= tgl_pinjam
+    if not dates_valid:
+        st.error("Rencana tanggal kembali tidak boleh lebih awal dari tanggal sewa.")
+
+    loan_ready = (
+        bool(nim and nim.strip())
+        and bool(nim.strip().isdigit())
+        and student_complete
+        and detail_valid
+        and dates_valid
+    )
+    ok = st.button("Simpan penyewaan", type="primary", width="stretch", disabled=not loan_ready)
     if ok:
-        nim=str(st.session_state.get("loan_nim","")).strip()
-        nama=str(st.session_state.get("loan_nama","")).strip()
-        no_hp=str(st.session_state.get("loan_hp","")).strip()
-        email=str(st.session_state.get("loan_email","")).strip()
-        missing_fields=[]
-        if not nim:
-            missing_fields.append("NIM")
-        if not nama:
-            missing_fields.append("Nama")
-        if jurusan not in PROGRAM_STUDI_PER_JURUSAN:
-            missing_fields.append("Jurusan")
-        if not prodi or prodi not in PROGRAM_STUDI_PER_JURUSAN.get(jurusan, []):
-            missing_fields.append("Program Studi")
-        if not no_hp:
-            missing_fields.append("Nomor HP")
-        if not email:
-            missing_fields.append("Email")
-
-        identity_valid=not missing_fields
-        if missing_fields:
-            st.error(
-                "Gagal menyimpan: Data mahasiswa belum lengkap! "
-                f"Silakan lengkapi bagian [{' / '.join(missing_fields)}]."
+        try:
+            code=db.create_loan(
+                matched_student["id"],
+                tgl_pinjam.isoformat(),
+                tgl_kembali.isoformat(),
+                selected_items,
+                catatan.strip(),
             )
-
-        name_mismatch=(
-            matched_student is not None
-            and " ".join(nama.split()).casefold()
-            != " ".join(matched_student["nama"].split()).casefold()
-        )
-        if name_mismatch:
-            st.error(
-                f"NIM {nim} sudah terdaftar atas nama {matched_student['nama']}. "
-                "Silakan periksa kembali data masukan Anda."
-            )
-            identity_valid=False
-        if nim and (not nim.isascii() or not nim.isdigit()):
-            st.error("Gagal menyimpan: NIM hanya boleh berisi angka tanpa titik, spasi, atau huruf.")
-            identity_valid=False
-        if nama and not all(character.isalpha() or character == " " for character in nama):
-            st.error("Gagal menyimpan: Nama lengkap hanya boleh berisi huruf dan spasi.")
-            identity_valid=False
-        if no_hp and (not no_hp.isascii() or not no_hp.isdigit()):
-            st.error("Gagal menyimpan: Nomor HP hanya boleh berisi angka.")
-            identity_valid=False
-
-        detail_valid=(
-            bool(selected_items)
-            and all_rows_valid
-            and all(isinstance(qty, int) and qty > 0 for _, qty in selected_items)
-        )
-        if not detail_valid:
-            st.error(
-                "Gagal menyimpan: Silakan pilih barang dan tentukan jumlah unit yang akan disewa."
-            )
-
-        dates_valid=tgl_kembali >= tgl_pinjam
-        if not dates_valid:
-            st.error(
-                "Gagal menyimpan: Rencana tanggal kembali tidak boleh lebih awal dari tanggal sewa."
-            )
-
-        if identity_valid and detail_valid and dates_valid:
-            try:
-                code=db.create_loan({"nim":nim,"nama":nama,"prodi":prodi,"no_hp":no_hp,"email":email},tgl_pinjam.isoformat(),tgl_kembali.isoformat(),selected_items,catatan.strip())
-                st.session_state["last_loan_code"]=code
-                st.rerun()
-            except Exception as error:
-                st.error(f"Gagal menyimpan penyewaan: {error}")
+            st.session_state["last_loan_code"]=code
+            st.rerun()
+        except Exception as error:
+            st.error(f"Gagal menyimpan penyewaan: {error}")
 
     if st.session_state.get("last_loan_code"):
         _nota(st.session_state["last_loan_code"])

@@ -324,10 +324,12 @@ def _normalize_inventory_codes(conn):
 def connect():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON"); migrate_schema(conn)
+    conn.execute("PRAGMA foreign_keys = ON")
+    migrate_schema(conn)
     return conn
 
-def _seed(conn):
+
+def _seed(conn, seed_example_students=False):
     conn.executescript("""
     DROP TABLE IF EXISTS admins;
     CREATE TABLE IF NOT EXISTS kategori (
@@ -336,7 +338,8 @@ def _seed(conn):
     );
     CREATE TABLE IF NOT EXISTS mahasiswa (
       id INTEGER PRIMARY KEY AUTOINCREMENT, nim TEXT UNIQUE NOT NULL,
-      nama TEXT NOT NULL, prodi TEXT DEFAULT '', no_hp TEXT DEFAULT '', email TEXT DEFAULT ''
+      nama TEXT NOT NULL, jurusan TEXT DEFAULT '', prodi TEXT DEFAULT '',
+      no_hp TEXT DEFAULT '', email TEXT DEFAULT ''
     );
     CREATE TABLE IF NOT EXISTS inventaris (
       id INTEGER PRIMARY KEY AUTOINCREMENT, kode TEXT UNIQUE NOT NULL,
@@ -396,11 +399,13 @@ def _seed(conn):
                 (kategori_ids[nama_baru], id_lama),
             )
             conn.execute("DELETE FROM kategori WHERE id=?", (id_lama,))
-    if conn.execute("SELECT COUNT(*) FROM mahasiswa").fetchone()[0] == 0:
-        conn.executemany("INSERT INTO mahasiswa(nim,nama,prodi,no_hp,email) VALUES(?,?,?,?,?)", [
-            ("2401001","Nadia Putri","Administrasi Bisnis","081234567801","nadia@example.com"),
-            ("2401002","Rizky Pratama","Teknik Informatika","081234567802","rizky@example.com"),
-            ("2401003","Salsa Maharani","Akuntansi","081234567803","salsa@example.com"),
+    if seed_example_students and conn.execute(
+        "SELECT COUNT(*) FROM mahasiswa"
+    ).fetchone()[0] == 0:
+        conn.executemany("INSERT INTO mahasiswa(nim,nama,jurusan,prodi,no_hp,email) VALUES(?,?,?,?,?,?)", [
+            ("2401001","Nadia Putri","Administrasi Bisnis","D3-Administrasi Bisnis","081234567801","nadia@example.com"),
+            ("2401002","Rizky Pratama","Teknik Elektro","D3-Teknik Informatika","081234567802","rizky@example.com"),
+            ("2401003","Salsa Maharani","Akuntansi","D3-Akuntansi","081234567803","salsa@example.com"),
         ])
     kategori_ids = {
         row["nama"]: row["id"]
@@ -459,23 +464,114 @@ def _seed(conn):
     conn.commit()
 
 def init_db(reset=False):
+    seed_example_students = reset or not DB_PATH.exists()
     if reset and DB_PATH.exists():
         DB_PATH.unlink()
     with connect() as conn:
-        _seed(conn)
+        _seed(conn, seed_example_students=seed_example_students)
         migrate_schema(conn)
 
 def query(sql, params=()):
     with connect() as conn:
         return [dict(r) for r in conn.execute(sql, params).fetchall()]
 
+
+def list_penyewa(keyword=""):
+    keyword_value = str(keyword or "").strip()
+    sql = """
+        SELECT m.id, m.nim, m.nama, m.jurusan, m.prodi, m.no_hp, m.email,
+               COUNT(p.id) AS jumlah_transaksi
+        FROM mahasiswa m
+        LEFT JOIN peminjaman p ON p.mahasiswa_id = m.id
+    """
+    params = ()
+    if keyword_value:
+        sql += " WHERE m.nama LIKE ? OR m.nim LIKE ?"
+        like_keyword = f"%{keyword_value}%"
+        params = (like_keyword, like_keyword)
+    sql += """
+        GROUP BY m.id
+        ORDER BY m.nama COLLATE NOCASE, m.nim
+    """
+    with connect() as conn:
+        rows = conn.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_penyewa(penyewa_id):
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT id,nim,nama,jurusan,prodi,no_hp,email FROM mahasiswa WHERE id=?",
+            (penyewa_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
 def get_student_by_nim(nim):
     with connect() as conn:
         row = conn.execute(
-            "SELECT nim,nama,prodi,no_hp,email FROM mahasiswa WHERE nim=?",
-            (nim.strip(),),
+            "SELECT id,nim,nama,jurusan,prodi,no_hp,email FROM mahasiswa WHERE nim=?",
+            (str(nim or "").strip(),),
         ).fetchone()
         return dict(row) if row else None
+
+
+def tambah_penyewa(nim, nama, no_hp, email, jurusan, prodi):
+    nim_value = str(nim or "").strip()
+    nama_value = str(nama or "").strip()
+    hp_value = str(no_hp or "").strip()
+    email_value = str(email or "").strip()
+    jurusan_value = str(jurusan or "").strip()
+    prodi_value = str(prodi or "").strip()
+
+    with connect() as conn:
+        existing = conn.execute("SELECT id,nama FROM mahasiswa WHERE nim=?", (nim_value,)).fetchone()
+        if existing:
+            raise ValueError(f"NIM {nim_value} sudah terdaftar atas nama {existing['nama']}.")
+        conn.execute(
+            "INSERT INTO mahasiswa(nim,nama,jurusan,prodi,no_hp,email) VALUES(?,?,?,?,?,?)",
+            (nim_value, nama_value, jurusan_value, prodi_value, hp_value, email_value),
+        )
+        conn.commit()
+        return conn.execute("SELECT id FROM mahasiswa WHERE nim=?", (nim_value,)).fetchone()["id"]
+
+
+def ubah_penyewa(penyewa_id, nama, no_hp, email, jurusan, prodi):
+    nama_value = str(nama or "").strip()
+    hp_value = str(no_hp or "").strip()
+    email_value = str(email or "").strip()
+    jurusan_value = str(jurusan or "").strip()
+    prodi_value = str(prodi or "").strip()
+
+    with connect() as conn:
+        row = conn.execute("SELECT id FROM mahasiswa WHERE id=?", (penyewa_id,)).fetchone()
+        if row is None:
+            raise ValueError("Data penyewa tidak ditemukan.")
+        conn.execute(
+            "UPDATE mahasiswa SET nama=?,jurusan=?,prodi=?,no_hp=?,email=? WHERE id=?",
+            (nama_value, jurusan_value, prodi_value, hp_value, email_value, penyewa_id),
+        )
+        conn.commit()
+
+
+def hapus_penyewa(penyewa_id):
+    with connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        penyewa = conn.execute(
+            "SELECT id FROM mahasiswa WHERE id=?",
+            (penyewa_id,),
+        ).fetchone()
+        if penyewa is None:
+            raise ValueError("Data penyewa tidak ditemukan.")
+        has_transactions = conn.execute(
+            "SELECT 1 FROM peminjaman WHERE mahasiswa_id=? LIMIT 1",
+            (penyewa_id,),
+        ).fetchone()
+        if has_transactions is not None:
+            raise ValueError("Penyewa tidak dapat dihapus karena masih memiliki transaksi penyewaan.")
+        conn.execute("DELETE FROM mahasiswa WHERE id=?", (penyewa_id,))
+        conn.commit()
+
 
 def execute(sql, params=()):
     with connect() as conn:
@@ -505,63 +601,51 @@ def _next_loan_code(conn):
     return f"PJM-{max(sequence_numbers, default=0) + 1:04d}"
 
 
-def create_loan(peminjam, tanggal_pinjam, tanggal_kembali, items, catatan=""):
+def create_loan(mahasiswa_id, tanggal_pinjam, tanggal_kembali, items, catatan=""):
     with connect() as c:
         c.execute("BEGIN IMMEDIATE")
-        kode = _next_loan_code(c)
-        if isinstance(peminjam, dict):
-            fields = ("nim", "nama", "prodi", "no_hp", "email")
-            if any(not str(peminjam.get(field, "")).strip() for field in fields):
-                raise ValueError("Data belum terisi semua")
-            nim = peminjam["nim"].strip()
-            existing = c.execute(
-                "SELECT id,nama FROM mahasiswa WHERE nim=?",
-                (nim,),
-            ).fetchone()
-            nama = peminjam["nama"].strip()
-            if existing and " ".join(existing["nama"].split()).casefold() != " ".join(nama.split()).casefold():
-                raise ValueError(
-                    f"NIM {nim} sudah terdaftar atas nama {existing['nama']}. "
-                    "Silakan periksa kembali data masukan Anda."
-                )
-            if existing:
-                c.execute(
-                    "UPDATE mahasiswa SET prodi=?,no_hp=?,email=? WHERE id=?",
-                    (
-                        peminjam["prodi"].strip(),
-                        peminjam["no_hp"].strip(),
-                        peminjam["email"].strip(),
-                        existing["id"],
-                    ),
-                )
-            else:
-                c.execute(
-                    "INSERT INTO mahasiswa(nim,nama,prodi,no_hp,email) VALUES(?,?,?,?,?)",
-                    tuple(peminjam[field].strip() for field in fields),
-                )
-            mahasiswa = c.execute("SELECT id FROM mahasiswa WHERE nim=?", (peminjam["nim"].strip(),)).fetchone()
-            mahasiswa_id = mahasiswa["id"]
-        else:
-            mahasiswa_id = peminjam
+        mahasiswa_id = int(mahasiswa_id)
+        mahasiswa = c.execute(
+            "SELECT id FROM mahasiswa WHERE id=?",
+            (mahasiswa_id,),
+        ).fetchone()
+        if mahasiswa is None:
+            raise ValueError("Penyewa tidak ditemukan dalam data master penyewa.")
+
         if not items:
             raise ValueError("Data belum terisi semua")
-        jumlah_item={}
+        jumlah_item = {}
         for inv_id, qty in items:
-            jumlah_item[inv_id]=jumlah_item.get(inv_id,0)+int(qty)
-        items=list(jumlah_item.items())
+            jumlah_item[inv_id] = jumlah_item.get(inv_id, 0) + int(qty)
+        items = list(jumlah_item.items())
         for inv_id, qty in items:
-            row = c.execute("SELECT kode,nama,harga,tersedia FROM inventaris WHERE id=?", (inv_id,)).fetchone()
+            row = c.execute(
+                "SELECT kode,nama,harga,tersedia FROM inventaris WHERE id=?",
+                (inv_id,),
+            ).fetchone()
             if not row or qty < 1 or qty > row["tersedia"]:
-                raise ValueError(f"Stok tersedia tidak cukup untuk {row['nama'] if row else 'inventaris'}.")
-        cur = c.execute("INSERT INTO peminjaman(kode,mahasiswa_id,tanggal_pinjam,tanggal_rencana_kembali,status,catatan) VALUES(?,?,?,?,?,?)",
-                        (kode,mahasiswa_id,tanggal_pinjam,tanggal_kembali,"Dipinjam",catatan))
+                raise ValueError(
+                    f"Stok tersedia tidak cukup untuk {row['nama'] if row else 'inventaris'}."
+                )
+
+        kode = _next_loan_code(c)
+        cur = c.execute(
+            "INSERT INTO peminjaman(kode,mahasiswa_id,tanggal_pinjam,tanggal_rencana_kembali,status,catatan) VALUES(?,?,?,?,?,?)",
+            (kode, mahasiswa_id, tanggal_pinjam, tanggal_kembali, "Dipinjam", catatan),
+        )
         loan_id = cur.lastrowid
         for inv_id, qty in items:
-            item = c.execute("SELECT kode,nama,harga FROM inventaris WHERE id=?", (inv_id,)).fetchone()
-            c.execute("""INSERT INTO detail_peminjaman
-              (peminjaman_id,inventaris_id,kode_barang,nama_barang,harga_satuan,jumlah)
-              VALUES(?,?,?,?,?,?)""", (loan_id,inv_id,item["kode"],item["nama"],item["harga"],qty))
-            c.execute("UPDATE inventaris SET tersedia=tersedia-? WHERE id=?",(qty,inv_id))
+            item = c.execute(
+                "SELECT kode,nama,harga FROM inventaris WHERE id=?",
+                (inv_id,),
+            ).fetchone()
+            c.execute(
+                """INSERT INTO detail_peminjaman
+                  (peminjaman_id,inventaris_id,kode_barang,nama_barang,harga_satuan,jumlah)
+                  VALUES(?,?,?,?,?,?)""",
+                (loan_id, inv_id, item["kode"], item["nama"], item["harga"], qty),
+            )
+            c.execute("UPDATE inventaris SET tersedia=tersedia-? WHERE id=?", (qty, inv_id))
         c.commit()
     return kode
 

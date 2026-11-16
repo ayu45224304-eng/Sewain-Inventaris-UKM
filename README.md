@@ -51,6 +51,14 @@ Aplikasi langsung membuka Dashboard. Database SQLite berada di `core/sewain.db` 
 
 Halaman Pengembalian mencatat tanggal kembali aktual dan kondisi setiap barang. Keterlambatan dikenai denda Rp1.500 per hari; lama keterlambatan, tarif, dan total denda disimpan bersama riwayat pengembalian.
 
+## Data Penyewa
+
+Menu Data Penyewa menyimpan dan mengelola data master penyewa, termasuk NIM,
+nama, jurusan, program studi, nomor telepon, dan email. Jurusan dan program
+studi wajib diisi; perubahan data dilakukan melalui ikon edit pada kolom EDIT
+di tabel. Form Penyewaan Baru hanya meminta NIM dan menggunakan data penyewa
+dari master.
+
 ## Deploy ke Streamlit Community Cloud
 
 1. Buat repositori GitHub baru, lalu unggah folder proyek ini. Jangan unggah
