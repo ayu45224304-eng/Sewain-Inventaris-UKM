@@ -51,6 +51,8 @@ Aplikasi langsung membuka Dashboard. Database SQLite berada di `core/sewain.db` 
 
 Halaman Pengembalian mencatat tanggal kembali aktual dan kondisi setiap barang. Keterlambatan dikenai denda Rp1.500 per hari; lama keterlambatan, tarif, dan total denda disimpan bersama riwayat pengembalian.
 
+Menu Tentang menampilkan deskripsi aplikasi, tim penyusun Kelompok 5, dan kontak.
+
 ## Data Penyewa
 
 Menu Data Penyewa menyimpan dan mengelola data master penyewa, termasuk NIM,

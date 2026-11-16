@@ -8,6 +8,7 @@ HALAMAN = [
     "Laporan",
     "Inventaris",
     "Data Penyewa",
+    "Tentang",
 ]
 
 DENDA_PER_HARI = 1500

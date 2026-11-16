@@ -40,3 +40,7 @@ la
 - Form `Penyewaan Baru` hanya menerima NIM dan membaca data penyewa dari master; data master tidak boleh diubah dari transaksi.
 - Jurusan dan Program studi wajib diisi pada data penyewa.
 - Data penyewa diubah lewat ikon edit pada kolom EDIT di tabel Data Penyewa.
+
+## 9. Halaman Tentang
+- Menu "Tentang" berisi deskripsi aplikasi, nama penyusun (Kelompok 5), dan kontak (sewain.inventaris.ukm@gmail.com).
+- Halaman ini statis dan tidak memakai database.

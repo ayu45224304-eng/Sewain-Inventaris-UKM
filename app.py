@@ -10,7 +10,7 @@ st.set_page_config(
 
 from core import db, styles
 from core.utils import HALAMAN
-from views import dashboard, data_penyewa, inventaris, laporan, penyewaan_baru, pengembalian, riwayat
+from views import dashboard, data_penyewa, inventaris, laporan, penyewaan_baru, pengembalian, riwayat, tentang
 
 styles.inject()
 db.init_db()
@@ -38,6 +38,7 @@ RUTE = {
     HALAMAN[4]: laporan.render,
     HALAMAN[5]: inventaris.render,
     HALAMAN[6]: data_penyewa.render,
+    HALAMAN[7]: tentang.render,
 }
 
 
@@ -66,6 +67,7 @@ with st.sidebar:
         ":material/analytics:",
         ":material/inventory_2:",
         ":material/groups:",
+        ":material/info:",
     ]
     for halaman, ikon in zip(HALAMAN, ikon_navigasi):
         st.button(
