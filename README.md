@@ -47,16 +47,18 @@ Di VS Code, buka terminal baru setelah folder proyek dibuka. Workspace akan memi
 
 Aplikasi akan terbuka di browser. Pengaturan otomatis ini berlaku untuk terminal terintegrasi VS Code; di terminal lain, aktifkan `.venv` terlebih dahulu.
 
-Aplikasi membuka halaman login single user sebelum Dashboard. Database SQLite berada di `core/sewain.db` dan dibuat otomatis dari data contoh jika belum tersedia.
+Aplikasi membuka halaman autentikasi sebelum Dashboard. Database SQLite berada di `core/sewain.db` dan dibuat otomatis dari data contoh jika belum tersedia.
 
-## Login Single User
+## Autentikasi Pengguna
 
-Saat database pertama kali dibuat, aplikasi membuat satu akun administrator:
+Halaman autentikasi menyediakan pilihan **Masuk** dan **Daftar**. Pengguna baru dapat membuat akun melalui tab **Daftar**, sedangkan akun yang sudah terdaftar dapat masuk melalui tab **Masuk**.
+
+Saat database pertama kali dibuat, aplikasi juga membuat satu akun administrator awal:
 
 - Username default: `admin`
 - Password default sementara: `sewain123`
 
-Segera ganti password default melalui tombol **Ubah Password** di sidebar setelah login. Untuk menentukan kredensial sejak awal, atur environment variable sebelum menjalankan aplikasi:
+Segera ganti password default melalui tombol **Ubah Password** di sidebar setelah login. Untuk menentukan kredensial admin sejak awal, atur environment variable sebelum menjalankan aplikasi:
 
 ```powershell
 $env:SEWAIN_ADMIN_USERNAME="admin"
@@ -64,7 +66,7 @@ $env:SEWAIN_ADMIN_PASSWORD="ganti-dengan-password-kuat"
 streamlit run app.py
 ```
 
-Environment variable hanya digunakan ketika tabel pengguna masih kosong. Mengubahnya setelah akun dibuat tidak akan menimpa password yang tersimpan. Password disimpan menggunakan PBKDF2-HMAC-SHA256 dengan salt acak dan 600.000 iterasi. Tombol **Logout** di sidebar mengakhiri sesi dan mengembalikan aplikasi ke halaman login.
+Environment variable hanya digunakan ketika tabel pengguna masih kosong. Mengubahnya setelah akun dibuat tidak akan menimpa password yang tersimpan. Password disimpan menggunakan PBKDF2-HMAC-SHA256 dengan salt acak dan 600.000 iterasi. Tombol **Logout** di sidebar mengakhiri sesi dan mengembalikan aplikasi ke halaman autentikasi.
 
 Halaman Pengembalian mencatat tanggal kembali aktual dan kondisi setiap barang. Keterlambatan dikenai denda Rp1.500 per hari; lama keterlambatan, tarif, dan total denda disimpan bersama riwayat pengembalian.
 

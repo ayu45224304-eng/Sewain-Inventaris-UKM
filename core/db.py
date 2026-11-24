@@ -354,6 +354,39 @@ def _seed_default_user(conn):
     )
 
 
+def register_user(username, password, confirmation, nama_lengkap=""):
+    username_value = str(username or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{3,50}", username_value):
+        raise ValueError(
+            "Username harus berisi 3–50 karakter: huruf, angka, titik, "
+            "underscore, atau tanda hubung."
+        )
+    validate_new_password(password, confirmation)
+    nama_value = str(nama_lengkap or "").strip() or username_value
+
+    try:
+        with connect() as conn:
+            existing = conn.execute(
+                "SELECT id FROM pengguna WHERE username=?",
+                (username_value,),
+            ).fetchone()
+            if existing is not None:
+                raise ValueError("Username sudah digunakan.")
+            cursor = conn.execute(
+                """INSERT INTO pengguna(username,password_hash,nama_lengkap)
+                VALUES(?,?,?)""",
+                (username_value, hash_password(password), nama_value),
+            )
+            conn.commit()
+            return {
+                "id": cursor.lastrowid,
+                "username": username_value,
+                "nama_lengkap": nama_value,
+            }
+    except sqlite3.IntegrityError as error:
+        raise ValueError("Username sudah digunakan.") from error
+
+
 def authenticate(username, password):
     username_value = str(username or "").strip()
     password_value = str(password or "")
@@ -401,6 +434,7 @@ def change_password(user_id, old_password, new_password, confirmation=None):
 def _seed(conn, seed_example_students=False):
     conn.executescript("""
     DROP TABLE IF EXISTS admins;
+    DROP INDEX IF EXISTS idx_pengguna_single_user;
     CREATE TABLE IF NOT EXISTS pengguna (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT NOT NULL COLLATE NOCASE UNIQUE,
@@ -409,7 +443,6 @@ def _seed(conn, seed_example_students=False):
       dibuat_pada TEXT NOT NULL DEFAULT (datetime('now','localtime')),
       diubah_pada TEXT NOT NULL DEFAULT (datetime('now','localtime'))
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_pengguna_single_user ON pengguna((1));
     CREATE TABLE IF NOT EXISTS kategori (
       id INTEGER PRIMARY KEY AUTOINCREMENT, kode TEXT UNIQUE NOT NULL,
       nama TEXT UNIQUE NOT NULL, keterangan TEXT DEFAULT ''

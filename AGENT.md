@@ -16,9 +16,10 @@ la
 - Menggunakan modul `sqlite3` bawaan Python untuk menyimpan data barang, peminjam, transaksi penyewaan, dan pengembalian.
 
 ## 4. Akses Pengguna
-- Wajib menggunakan halaman Login single user dengan username dan password.
+- Wajib menggunakan halaman autentikasi dengan pilihan **Masuk** dan **Daftar**.
+- Aplikasi mendukung multi-user dengan username dan password; username harus unik.
 - Password disimpan sebagai hash PBKDF2-HMAC-SHA256 dengan salt acak dan 600.000 iterasi; password asli tidak boleh disimpan.
-- Akun awal dibuat dari `SEWAIN_ADMIN_USERNAME` dan `SEWAIN_ADMIN_PASSWORD`; kredensial default sementara adalah `admin` / `sewain123` dan wajib diganti setelah login.
+- Akun admin awal dibuat dari `SEWAIN_ADMIN_USERNAME` dan `SEWAIN_ADMIN_PASSWORD`; kredensial default sementara adalah `admin` / `sewain123` dan wajib diganti setelah login.
 - Sesi login memakai `st.session_state`; tersedia menu Ubah Password dan Logout di sidebar.
 
 ## 5. Acuan Perancangan

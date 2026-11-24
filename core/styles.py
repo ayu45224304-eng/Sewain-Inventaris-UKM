@@ -70,6 +70,8 @@ def inject():
     .page-kicker { display:inline-block;padding:4px 8px;background:#d8e8fb;border-radius:4px;color:#1c58a5;font-size:11px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase; }
     .page-intro { color:#526b8a;margin-top:-8px;margin-bottom:18px; }
     .notice { padding:12px 15px;background:linear-gradient(100deg,#dceafb,#edf5ff);border:1px solid #bfd4ef;border-left:4px solid #3979c9;border-radius:8px;color:#1e40af; }
+    div[data-testid="stFullScreenFrame"] > div:has(> div[data-testid="stImage"]) { width:100%; }
+    div[data-testid="stImage"] { display:flex;justify-content:center;width:100%; }
     div[data-testid="stImage"] img { display:block;margin:0 auto; }
     .login-heading { font-family:Manrope,sans-serif;font-size:28px;font-weight:800;color:#102a56;text-align:center;margin-top:12px; }
     .login-subtitle { color:#60748f;text-align:center;margin:4px 0 24px; }
