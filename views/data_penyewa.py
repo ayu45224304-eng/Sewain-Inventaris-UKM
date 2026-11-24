@@ -94,7 +94,6 @@ def _render_penyewa_table(rows):
     )
     st.dataframe(
         frame,
-        alt="Daftar data penyewa",
         column_config={
             "NIM": st.column_config.TextColumn("NIM", alignment="center"),
             "NAMA": st.column_config.TextColumn("NAMA", alignment="left"),

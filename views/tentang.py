@@ -35,7 +35,6 @@ def render():
         anggota = pd.DataFrame(ANGGOTA_PENYUSUN, columns=["NO", "NAMA", "NIM"])
         st.dataframe(
             anggota,
-            alt="Daftar anggota penyusun Sewain",
             column_config={
                 "NO": st.column_config.NumberColumn("NO", format="%d", alignment="center"),
                 "NAMA": st.column_config.TextColumn("NAMA", alignment="left"),

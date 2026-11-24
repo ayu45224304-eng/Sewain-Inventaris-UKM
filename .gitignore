@@ -1,5 +1,6 @@
 .venv/
 sewainvenv/
+.env
 __pycache__/
 *.pyc
 core/*.db

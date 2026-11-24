@@ -1,8 +1,15 @@
+import os
 import sqlite3
 import re
 from pathlib import Path
 from datetime import date, datetime, timedelta
 from core.migrations import migrate_schema
+from core.security import (
+    MAX_PASSWORD_LENGTH,
+    hash_password,
+    validate_new_password,
+    verify_password,
+)
 from core.utils import DENDA_PER_HARI
 
 DB_PATH = Path(__file__).resolve().parent / "sewain.db"
@@ -329,9 +336,80 @@ def connect():
     return conn
 
 
+def _seed_default_user(conn):
+    if conn.execute("SELECT id FROM pengguna LIMIT 1").fetchone() is not None:
+        return
+
+    username = str(os.getenv("SEWAIN_ADMIN_USERNAME", "admin")).strip() or "admin"
+    password = os.getenv("SEWAIN_ADMIN_PASSWORD", "sewain123")
+    try:
+        password_hash = hash_password(password)
+    except ValueError as error:
+        raise ValueError("SEWAIN_ADMIN_PASSWORD harus berisi 8–128 karakter.") from error
+
+    conn.execute(
+        """INSERT INTO pengguna(username,password_hash,nama_lengkap)
+        VALUES(?,?,?)""",
+        (username, password_hash, "Administrator"),
+    )
+
+
+def authenticate(username, password):
+    username_value = str(username or "").strip()
+    password_value = str(password or "")
+    if not username_value or not password_value:
+        return None
+    if len(password_value) > MAX_PASSWORD_LENGTH:
+        return None
+
+    with connect() as conn:
+        row = conn.execute(
+            """SELECT id,username,nama_lengkap,password_hash
+            FROM pengguna WHERE username=?""",
+            (username_value,),
+        ).fetchone()
+        if row is None or not verify_password(password_value, row["password_hash"]):
+            return None
+        return {
+            "id": row["id"],
+            "username": row["username"],
+            "nama_lengkap": row["nama_lengkap"],
+        }
+
+
+def change_password(user_id, old_password, new_password, confirmation=None):
+    validate_new_password(new_password, confirmation)
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT password_hash FROM pengguna WHERE id=?",
+            (user_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError("Akun pengguna tidak ditemukan.")
+        if not verify_password(str(old_password or ""), row["password_hash"]):
+            raise ValueError("Password lama tidak sesuai.")
+
+        conn.execute(
+            """UPDATE pengguna
+            SET password_hash=?,diubah_pada=datetime('now','localtime')
+            WHERE id=?""",
+            (hash_password(new_password), user_id),
+        )
+        conn.commit()
+
+
 def _seed(conn, seed_example_students=False):
     conn.executescript("""
     DROP TABLE IF EXISTS admins;
+    CREATE TABLE IF NOT EXISTS pengguna (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL COLLATE NOCASE UNIQUE,
+      password_hash TEXT NOT NULL,
+      nama_lengkap TEXT NOT NULL DEFAULT 'Administrator',
+      dibuat_pada TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      diubah_pada TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_pengguna_single_user ON pengguna((1));
     CREATE TABLE IF NOT EXISTS kategori (
       id INTEGER PRIMARY KEY AUTOINCREMENT, kode TEXT UNIQUE NOT NULL,
       nama TEXT UNIQUE NOT NULL, keterangan TEXT DEFAULT ''
@@ -381,6 +459,7 @@ def _seed(conn, seed_example_students=False):
       SELECT RAISE(ABORT, 'Kategori masih digunakan oleh barang inventaris.');
     END;
     """)
+    _seed_default_user(conn)
     conn.executemany(
         """INSERT INTO kategori(kode,nama,keterangan) VALUES(?,?,?)
         ON CONFLICT(nama) DO UPDATE SET
